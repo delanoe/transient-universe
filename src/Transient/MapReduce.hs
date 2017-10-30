@@ -35,6 +35,7 @@ data PartRef a=PartRef a
 
 import Transient.Internals hiding (Ref)
 
+import Debug.Trace (trace)
 import Transient.Move.Internals hiding (pack)
 import Transient.Indeterminism
 import Control.Applicative
@@ -73,8 +74,6 @@ type Save= Bool
 
 instance Indexable (Partition a) where
     key (Part _ string b _)= keyp string b
-
-
 
 keyp s True= "PartP@"++s :: String
 keyp s False="PartT@"++s
@@ -430,15 +429,15 @@ textUrl :: String -> DDS (DV.Vector Text.Text)
 textUrl= getUrl  (map Text.pack . words)
 
 -- | generate a DDS from the content of a URL.
--- The first parameter is a function that divide the text in words
+-- The first parameter is a function that divides the text in words
 getUrl :: (Loggable a, Distributable vector a) => (String -> [a]) -> String -> DDS (vector a)
-getUrl partitioner url= DDS $ do
+getUrl partitioner url = DDS $ do
    nodes <- local getEqualNodes                                        -- !> "DISTRIBUTE"
    let lnodes = length nodes
 
    parallelize  (process lnodes)  $ zip nodes [0..lnodes-1]    -- !> show xss
    where
-   process lnodes (node,i)=  runAt node $ local $ do
+   process lnodes (node,i) = runAt node $ local $ do
                         r <- liftIO . simpleHTTP $ getRequest url
                         body <- liftIO $  getResponseBody r
                         let xs = partitioner body
@@ -454,18 +453,20 @@ textFile= getFile (map Text.pack . words)
 -- | generate a DDS from a file. All the nodes must access the file with the same path
 -- the first parameter is the parser that generates elements from the content
 getFile :: (Loggable a, Distributable vector a) => (String -> [a]) ->  String -> DDS (vector a)
-getFile partitioner file= DDS $ do
+getFile partitioner file = DDS $ do
    nodes <- local getEqualNodes                                        -- !> "DISTRIBUTE"
    let lnodes = length nodes
 
    parallelize  (process lnodes) $ zip nodes [0..lnodes-1]    -- !> show xss
    where
    process lnodes (node, i)=  runAt node $ local $ do
-                        content <- liftIO $ readFile file
+                        content <-  do
+                              c <- liftIO $ readFile file
+                              trace (show $ Prelude.map show $ words c) $ length c `seq` return c
                         let xs = partitioner content
-                            size= case length xs `div` lnodes of 0 ->1 ; n -> n
-                            xss=Transient.MapReduce.fromList $ take size $ drop  (i *  size) xs  -- !> size
-                        generateRef    xss
+                            size = case length xs `div` lnodes of 0 ->1 ; n -> n
+                            xss  = Transient.MapReduce.fromList $ take size $ drop  (i *  size) xs  -- !> size
+                        generateRef xss
 
 
 

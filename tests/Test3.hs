@@ -8,7 +8,7 @@ import           Transient.Base
 import           Transient.Indeterminism
 import           Transient.Logged
 import           Transient.Move
-import           Transient.Stream.Resource
+--import           Transient.Stream.Resource
 import           Control.Applicative
 import           System.Info
 import           Control.Concurrent
